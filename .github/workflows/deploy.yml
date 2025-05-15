@@ -24,12 +24,19 @@ jobs:
         run: |
           ssh-keyscan ec2-34-238-240-19.compute-1.amazonaws.com >> ~/.ssh/known_hosts
 
-      - name: Deploy to EC2
+      - name: Deploy to EC2 and Restart Flask
         run: |
-          ssh -i ~/.ssh/id_rsa ubuntu@ec2-34-238-240-19.compute-1.amazonaws.com '
-            cd flask-app &&
-            git pull origin main &&
-            sudo systemctl restart flask-app || echo "Restart failed. Check manually."
-          '
+          ssh -i ~/.ssh/id_rsa ubuntu@ec2-34-238-240-19.compute-1.amazonaws.com << 'EOF'
+            cd /home/ubuntu/flask-app
+            git pull origin main
 
-
+            # Try systemd restart first
+            if sudo systemctl is-active --quiet flask-app; then
+              echo "Restarting flask-app via systemd..."
+              sudo systemctl restart flask-app
+            else
+              echo "systemd not found or flask-app not registered, falling back to manual restart..."
+              pkill -f app.py || echo "No running app.py found"
+              nohup python3 app.py > log.txt 2>&1 &
+            fi
+          EOF
